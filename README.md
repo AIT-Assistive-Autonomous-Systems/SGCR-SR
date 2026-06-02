@@ -1,4 +1,4 @@
-# Private General Deshadowing
+# Semantic and Geometric Cascaded Refinement for Shadow Removal - SGCR-SR
 
 This repository contains the training and evaluation code for the SGCR / multi-stage ShadowFormer deshadowing experiments. Experiments are configured with [YAECS](https://github.com/valentingol/yaecs): the default configuration lives in `config/default/_root_default.yaml`, and the experiment configurations used for training and ablations live under `config/training/`.
 
