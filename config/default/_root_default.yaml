@@ -1,0 +1,153 @@
+# Global Settings
+save_dir: !experiment_path /path/to/output/experiments
+experiment_purpose: !type:Optional[str] Default purpose.
+
+debug: !type:bool false
+# manual_seed: !type:Optional[int] null
+# device: !type:(str,int) 0
+mode: !type:str shadow              # image restoration mode
+run_mode: !str train
+
+
+
+# Losses
+lambda_lpips: !type:float 0.0
+net: !type:str vgg
+lpips_compute_in_fp32: !type:Optional[bool] null
+lpips_clamp_01: !type:Optional[bool] null
+
+
+
+# Paths / Weights
+pretrain_weights: !type:Optional[str] null
+train_dir: !type:str /path/to/dataset/train
+val_dir: !type:str /path/to/dataset/val
+extra_train_dirs: !type:Optional[list] null  # additional dirs with same structure as train_dir; concatenated into training set
+
+# Optimization
+batch_size: !type:int 4
+validation_batch_size: !type:int 1
+nepoch: !type:int 500
+optimizer: !type:str adamw
+lr_scheduler: !type:str cosine
+lr_initial: !type:float 0.0002
+weight_decay: !type:float 0.02
+warmup: !type:bool true
+warmup_epochs: !type:int 3
+lr_step_size: !type:Optional[int] null
+lr_min: !type:Optional[float] null
+warmup_start_factor: !type:Optional[float] 0.1
+lr_gamma: !type:Optional[float] null
+lr_T_max: !type:Optional[float] null
+tresh_gradient_clipping: !type:Optional[float] 10
+reconstruction_loss: charbonnier
+lr_T_mult: !type:float 1.0
+
+# Data
+train_workers: !type:int 8          # train_dataloader workers
+eval_workers: !type:int 4           # eval_dataloader workers
+dataset: !type:str render_data
+dino_imagenet_norm: !type:bool false
+tile_overlap: !type:Optional[int] null
+tile_size: null  # int (square) or [h, w] list for rectangular tiles, e.g. [480, 640]
+eval_resize: null  # null = evaluate at native resolution; [H, W] = bilinear-resize restored+target before metrics (e.g. [256, 256] to match Xu et al. CVPR 2025 ISTD+ protocol)
+
+# Training augmentations (dataset-level)
+aug_all_rotations: !type:bool false    # use all 9 transforms (0–8) instead of just 0–2
+aug_hflip: !type:bool false            # 50% horizontal flip (with point/normal X-negation)
+aug_multiscale: !type:bool false       # random scale in [1.0, 1.5] before crop
+
+
+# Architecture
+arch: !type:str ShadowFormer
+norm_layer: !type:str nn.LayerNorm
+embed_dim: !type:int 32
+win_size: !type:int 16
+token_projection: !type:str linear  # linear/conv token projection
+token_mlp: !type:str leff           # ffn/leff token mlp
+att_se: !type:bool false            # se after sa
+use_dino: true
+use_depth: !type:bool true            # if false, depth (point) is zeroed out
+use_normal: !type:bool true           # if false, surface normals are zeroed out
+multi_stage_mode: !type:Optional[str] direct
+use_ycbcr_correction: !type:Optional[bool] false
+
+
+# Training / Evaluation Flow
+eval_now: !type:int 10               # after how many training steps to evaluate
+train_ps: !type:int 512             # patch size of training sample
+resume: !type:bool false
+
+# Saving / Logging
+save_images: !type:bool false
+env: !type:str _sgcr
+checkpoint: !type:int 5
+
+# Distributed
+local_rank: !type:int 0
+
+# NTIRE2025
+dino_name: !type:str dinov2_vitl14
+
+#tracker: !tracker_config
+#  type: basic, tensorboard
+#  logdir: "%e/tb_logs"
+tracker: !tracker_config
+  type: basic
+
+# fine control
+config_variations: !config_variations null
+base_file: !additional_config_file null
+
+# losses
+lambda_id: !type:Optional[float] null
+lambda_bgrad: !type:Optional[float] null
+lambda_alpha: !type:Optional[float] null
+lambda_hessian: !type:Optional[float] null
+
+# Multi-stage supervision (intermediate stages)
+# Applies the given weight to all intermediate stage outputs (m.ys[:-1]).
+# lambda_stage takes precedence; lambda_stage1 is the legacy name kept for backward compat.
+lambda_stage: !type:Optional[float] null
+lambda_stage1: !type:Optional[float] null
+lam_tv: !type:Optional[float] null
+lam_pseudo: !type:Optional[float] null
+lambda_grad: !type:Optional[float] 0.0
+lambda_ssim: 0.0
+ssim_loss_luma: !type:Optional[bool] null
+
+# ---- Solution 2: progressive LPF stage supervision ----
+# When > 0, intermediate stage outputs are supervised against a Gaussian-blurred
+# target (sigma_max at stage 0, linearly decaying to 0 at the last intermediate).
+# Forces early stages to learn coarse illumination; later stages refine detail.
+lambda_stage_lpf_sigma_max: !type:float 0.0
+
+# ---- Solution 4: contraction constraint loss ----
+# Hinge loss penalising any stage that regresses further from GT than the previous.
+# Enforces monotone improvement across stages without fixing an exact schedule.
+lambda_contraction: !type:float 0.0
+
+
+# ---- debug saving ----
+debug_save: !type:Optional[bool] null
+debug_dir: !type:Optional[str] null
+debug_every: !type:Optional[int] null         # save every N samples (dataset calls)
+debug_max: !type:Optional[int] null           # cap number of saved images
+debug_only_rank0: !type:Optional[bool] null
+
+# augmentation hyperparameters
+save_dir: !type:Optional[str] null
+
+n_stage: !type:Optional[int] null
+tie_stage_weights: !type:Optional[bool] null
+copy_stage1_to_stage2: !type:Optional[bool] null  # if true, init stage[2] from stage[1] weights after loading pretrain
+force_copy_stages: !type:bool false               # if true, force copy even when checkpoint already has multi-stage weights
+lambda_stage_weights: !type:Optional[list] null   # per-intermediate-stage loss weights, e.g. [0.25, 1.0] for n_stage=3
+dynamic_stage_weights: !type:bool false           # if true, downweight intermediate stages dynamically by their loss magnitude
+
+train_only: false
+
+# --- inference augmentation & ensemble ---
+tta_hflip: !type:bool false                     # horizontal-flip TTA at validation/test time
+ensemble_weights: !type:Optional[list] null     # list of checkpoint paths to ensemble; null = single model (same-arch only)
+ensemble_configs: !type:Optional[list] null     # list of config yaml paths, one per member — enables cross-architecture ensemble; each config must have pretrain_weights set

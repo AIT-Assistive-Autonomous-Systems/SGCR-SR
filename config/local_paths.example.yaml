@@ -1,0 +1,6 @@
+save_dir: /path/to/output/experiments/n3_s4
+train_dir: /path/to/dataset/train
+val_dir: /path/to/dataset/val
+pretrain_weights: /path/to/checkpoints/model_best.pth
+train_workers: 8
+eval_workers: 4
