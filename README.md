@@ -1,8 +1,37 @@
 # Semantic and Geometric Cascaded Refinement for Shadow Removal - SGCR-SR
 
-This repository contains the training and evaluation code for the SGCR / multi-stage ShadowFormer deshadowing experiments. Experiments are configured with [YAECS](https://github.com/valentingol/yaecs): the default configuration lives in `config/default/_root_default.yaml`, and the experiment configurations used for training and ablations live under `config/training/`.
+This repository contains the training and evaluation code for the SGCR experiments that won the NTIRE shadow removal challenge at CVPR 2026. Experiments are configured with [YAECS](https://github.com/valentingol/yaecs): the default configuration lives in `config/default/_root_default.yaml`, and the experiment configurations used for training and ablations live under `config/training/`.
 
-> **Checkpoints.** The released repository does not currently include model checkpoints. The checkpoints required for exact reproduction will be added during CVPRW and will be freely available. Until then, set `pretrain_weights` to a local checkpoint if you have one, or train the models from the provided configs.
+> **Checkpoints.** The checkpoints are available on Hugging Face: https://huggingface.co/BeltrameAIT/SGCR-SR/tree/main/SGCR-SR/checkpoints.
+To download them please run:
+ ```bash
+hf download BeltrameAIT/SGCR-SR --local-dir SGCR-SR
+```
+
+## Qualitative Results
+
+Comparison of shadow-removal results across representative samples.
+
+![Qualitative shadow removal results](Qualitative_Results.png)
+
+## Quick Start
+
+```bash
+git clone --recurse-submodules https://github.com/AIT-Assistive-Autonomous-Systems/SGCR-SR.git
+cd SGCR-SR
+
+conda create -n sgcr python=3.11 -y
+conda activate sgcr
+python -m pip install --upgrade pip
+conda install -c conda-forge gdal -y
+pip install -r requirements.txt
+
+hf download BeltrameAIT/SGCR-SR \
+  --include "SGCR-SR/checkpoints/*" \
+  --local-dir SGCR-SR
+
+python main.py --config "[config/validation/base/config.yaml,config/local_infer_paths.yaml]"
+```
 
 ## Repository layout
 
@@ -38,8 +67,8 @@ Tested environment assumptions from the exported files:
 Clone the repository with submodules, or initialise the `OmniSR` submodule after extracting the archive:
 
 ```bash
-git clone --recurse-submodules <REPO_URL>
-cd Private_general_deshadowing-public
+git clone --recurse-submodules https://github.com/AIT-Assistive-Autonomous-Systems/SGCR-SR.git
+cd SGCR-SR
 
 # If the repository was cloned without submodules, run:
 git submodule update --init --recursive
@@ -71,18 +100,7 @@ pip install -r requirements.txt
 
 If your CUDA driver or cluster image is incompatible with the pinned `torch`, `torchvision`, `xformers`, or CUDA wheel versions in `requirements.txt`, install the PyTorch stack that matches your CUDA setup first, then install the remaining requirements.
 
-A minimal import check is:
 
-```bash
-python - <<'PY'
-import torch
-import yaecs
-import timm
-import lpips
-print("torch:", torch.__version__, "cuda:", torch.cuda.is_available())
-print("yaecs import ok")
-PY
-```
 
 ## Dataset format
 
@@ -179,7 +197,7 @@ The main experiment config is:
 python main.py --config "[config/training/base/config.yaml,config/local_paths.yaml]"
 ```
 
-This corresponds to the 3-stage `NStageShadowFormer` setting with S4 contraction loss and stage warm-starting.
+This corresponds to the 3-stage `NStageShadowFormer` setting with contraction loss and stage warm-starting.
 
 To reproduce the ablations, replace the first config path with one of the following:
 
@@ -208,44 +226,53 @@ The `config/training/progression_history/` directory contains earlier training s
 
 ## Validation and test inference
 
-Validation requires a checkpoint in `pretrain_weights` and a validation split with ground truth:
+Inference configs are now provided under `config/validation/` (plus dataset-specific variants in `config/ISTD/validation/` and `config/UAV_SC/validation/`).
+
+Each config mirrors its training counterpart and is set to:
+
+- `run_mode: test`
+- inference output roots under `/path/to/output/inference/...`
+- `pretrain_weights` paths aligned with the Hugging Face checkpoint layout (`SGCR-SR/checkpoints/...`)
+
+Examples:
+
+```bash
+# Main 3-stage model
+python main.py --config config/validation/base/config.yaml
+
+# Geometry ablation (no DINO)
+python main.py --config config/validation/geometry_ablation/no_dino/config.yaml
+
+# Ensemble variant
+python main.py --config config/validation/ensemble/n3_s4/config.yaml
+
+# ISTD and UAV-SC variants
+python main.py --config config/ISTD/validation/base/config.yaml
+python main.py --config config/UAV_SC/validation/base/config.yaml
+```
+
+For split/dataset-specific inference, override only `val_dir` (and optionally `save_dir`) with a small local override file:
 
 ```yaml
-# config/local_val.yaml
-run_mode: val
-save_dir: /path/to/output/eval_n3_s4
-val_dir: /path/to/dataset/val
-pretrain_weights: /path/to/checkpoints/model_best.pth
+# config/local_infer_paths.yaml
+val_dir: /path/to/dataset/test
+save_dir: /path/to/output/inference/my_run
 ```
 
 ```bash
-python main.py --config "[config/training/base/config.yaml,config/local_val.yaml]"
+python main.py --config "[config/validation/base/config.yaml,config/local_infer_paths.yaml]"
 ```
 
-Validation writes restored images and diagnostics under:
+If you want to run inference on checkpoints from your own training runs instead of the downloaded Hugging Face checkpoints, point `pretrain_weights` to the training output structure:
 
 ```text
-<save_dir>/log/<arch><env>_val/results/
-```
-
-Test inference uses `run_mode: test` and reads images from `val_dir`, but does not require `shadow_free/`:
-
-```yaml
-# config/local_test.yaml
-run_mode: test
-save_dir: /path/to/output/test_n3_s4
-val_dir: /path/to/dataset/test
-pretrain_weights: /path/to/checkpoints/model_best.pth
-```
-
-```bash
-python main.py --config "[config/training/base/config.yaml,config/local_test.yaml]"
+<train_save_dir>/log/<arch><env><timestamp>/models/model_best.pth
 ```
 
 Test predictions are written under:
 
 ```text
-<save_dir>/log/<arch><env>_test/results/
+<save_dir>/log/<arch><env><timestamp>/results/
 ```
 
 ## Checkpoints and logs
@@ -325,3 +352,15 @@ Reduce `batch_size` for training, or reduce `tile_size` / increase tiled inferen
 ### Paths use placeholders
 
 The checked-in configs use placeholder paths like `/path/to/dataset/...` and `/path/to/output/...`. Copy `config/local_paths.example.yaml` to `config/local_paths.yaml`, set your local `save_dir`, `train_dir`, `val_dir`, and `pretrain_weights`, and pass it as an override config.
+
+### Citation
+If you found our work useful please cite the NTIRE 2026 winning method:
+```bibtex
+@inproceedings{beltrame2026winner,
+  title={Winner of CVPR2026 NTIRE Challenge on Image Shadow Removal: Semantic and Geometric Guidance for Shadow Removal via Cascaded Refinement},
+  author={Beltrame, Lorenzo and Salzinger, Jules and Svoboda, Filip and Lampert, Jasmin and Fanta-Jende, Phillipp and Timofte, Radu and K{\"o}rner, Marco},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={1637--1646},
+  year={2026}
+}
+```
